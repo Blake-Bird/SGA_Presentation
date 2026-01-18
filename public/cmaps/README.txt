@@ -1,0 +1,1 @@
+Placeholder folder. Optional for PDF.js CMaps; kept so paths exist if you later add them.

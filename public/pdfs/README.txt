@@ -1,0 +1,1 @@
+You can replace these PDFs with updated versions as long as filenames stay the same. Otherwise update file paths in components/widgets/PdfWall.tsx.
