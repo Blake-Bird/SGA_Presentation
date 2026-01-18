@@ -1,10 +1,9 @@
 "use client";
 
-import { AppState } from "@/lib/types";
-import { useState } from "react";
 import type { AppState } from "@/lib/types";
 import { downloadState, importStateFromFile } from "@/lib/store";
 import { useState } from "react";
+
 
 
 export default function Slide04Export({
@@ -28,8 +27,8 @@ export default function Slide04Export({
         <div className="mt-6 flex flex-wrap gap-2">
           <button
             onClick={() => {
-              const j = actions.exportJson();
-              navigator.clipboard?.writeText(j);
+              const json = JSON.stringify(state, null, 2);
+              navigator.clipboard?.writeText(json);
             }}
             className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
           >
@@ -37,10 +36,17 @@ export default function Slide04Export({
           </button>
 
           <button
-            onClick={() => setRaw(actions.exportJson())}
+            onClick={() => setRaw(JSON.stringify(state, null, 2))}
             className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
           >
             Show Export JSON
+          </button>
+
+          <button
+            onClick={() => downloadState(state)}
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+          >
+            Download JSON File
           </button>
         </div>
 
@@ -53,11 +59,30 @@ export default function Slide04Export({
 
         <div className="mt-3 flex gap-2">
           <button
-            onClick={() => actions.importJson(raw)}
+            onClick={() => {
+              try {
+                const parsed = JSON.parse(raw) as AppState;
+                setState(parsed);
+              } catch {
+                alert("Invalid JSON");
+              }
+            }}
             className="rounded-2xl border border-white/10 bg-white/10 px-4 py-2 text-sm font-semibold hover:bg-white/15"
           >
             Import JSON
           </button>
+          
+          <button
+            onClick={async () => {
+              const imported = await importStateFromFile();
+              if (imported) setState(imported);
+            }}
+            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
+          >
+            Import from File
+          </button>
+
+
           <button
             onClick={() => setRaw("")}
             className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
