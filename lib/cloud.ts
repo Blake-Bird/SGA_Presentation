@@ -100,6 +100,13 @@ export async function writeRoomState(
     updated_at: new Date().toISOString(),
   };
 
+  const { error } = await supabase.from("room_state").upsert(payload, {
+    onConflict: "room_id",
+  });
+
+  if (error) throw error;
+}
+
   // 1) try update (fast path)
   const { data: updated, error: updErr } = await supabase
     .from("room_state")

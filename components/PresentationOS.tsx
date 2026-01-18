@@ -83,7 +83,7 @@ export default function PresentationOS({
             {[0, 1, 2, 3].map((i) => (
               <button
                 key={i}
-                onClick={() => setState(setActiveSlide(state, i))}
+                onClick={() => setState((prev) => setActiveSlide(prev, i))}
                 className={`h-10 w-10 rounded-full border text-sm transition ${
                   slide === i
                     ? "border-white/30 bg-white/10"
