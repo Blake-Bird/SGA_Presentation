@@ -82,3 +82,14 @@ out
 # macOS
 .DS_Store
 
+# Next.js build output
+.next/
+out/
+
+# local env
+.env.local
+
+# mac junk
+.DS_Store
+**/.DS_Store
+
