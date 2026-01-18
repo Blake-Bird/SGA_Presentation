@@ -9,24 +9,19 @@ type RoomDoc = {
   };
 };
 
-// don't sync ui (local-only)
+// don't sync ui
 function stripUi(state: AppState): AppState {
   const { ui, ...rest } = state as any;
   return rest as AppState;
 }
 
-/**
- * Subscribe to shared room state:
- * - loads initial snapshot from Postgres
- * - listens to realtime updates from Postgres table
- */
 export function subscribeRoomState(
   roomId: string,
   cb: (doc: RoomDoc | null) => void
 ) {
   let cancelled = false;
 
-  // 1) initial fetch
+  // initial fetch
   (async () => {
     const { data, error } = await supabase
       .from("room_state")
@@ -36,9 +31,8 @@ export function subscribeRoomState(
 
     if (cancelled) return;
 
-    if (error || !data) {
-      cb(null);
-    } else {
+    if (error || !data) cb(null);
+    else {
       cb({
         state: data.state as any,
         __meta: {
@@ -49,7 +43,7 @@ export function subscribeRoomState(
     }
   })();
 
-  // 2) realtime subscription
+  // realtime
   const channel = supabase
     .channel(`room_state:${roomId}`)
     .on(
@@ -81,10 +75,6 @@ export function subscribeRoomState(
   };
 }
 
-/**
- * Persist latest state into Postgres.
- * Uses UPSERT so the row is created if missing.
- */
 export async function writeRoomState(
   roomId: string,
   state: AppState,
@@ -105,10 +95,6 @@ export async function writeRoomState(
   if (error) throw error;
 }
 
-/**
- * Upload PDF to Supabase Storage and return a public URL.
- * Bucket: room-pdfs
- */
 export async function uploadPdfToRoom(roomId: string, file: File) {
   const id =
     (crypto as any)?.randomUUID?.() ??
@@ -128,7 +114,5 @@ export async function uploadPdfToRoom(roomId: string, file: File) {
   if (upErr) throw upErr;
 
   const { data } = supabase.storage.from("room-pdfs").getPublicUrl(path);
-  const url = data.publicUrl;
-
-  return { id, url, storagePath: path };
+  return { id, url: data.publicUrl, storagePath: path };
 }

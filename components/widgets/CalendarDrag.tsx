@@ -111,10 +111,11 @@ export default function CalendarDrag({
 
 
   function createNewEvent() {
-    const title = prompt("New event name?");
-    if (!title) return;
+  const title = prompt("New event name?");
+  if (!title) return;
 
-    const next = addEvent(state, {
+  setState((prev) =>
+    addEvent(prev, {
       title,
       category: "Other",
       status: "Planned",
@@ -124,7 +125,10 @@ export default function CalendarDrag({
       notes: "",
       booking: { booked: false },
       social: { status: "Not started", notes: "", assets: [] },
-      purchase: { statusText: "Planned — not submitted", lastUpdateISO: new Date().toISOString() },
+      purchase: {
+        statusText: "Planned — not submitted",
+        lastUpdateISO: new Date().toISOString(),
+      },
       checklist: [
         { id: cryptoRandomId(), label: "Book location", done: false },
         { id: cryptoRandomId(), label: "Finalize supplies/items", done: false },
@@ -132,10 +136,9 @@ export default function CalendarDrag({
         { id: cryptoRandomId(), label: "First post scheduled", done: false },
       ],
       items: [],
-    } as any);
-
-    setState(next);
-  }
+    } as any)
+  );
+}
 
   return (
     <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
