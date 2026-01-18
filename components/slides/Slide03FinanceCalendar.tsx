@@ -32,9 +32,9 @@ export default function Slide03FinanceCalendar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstId]);
 
-  const selectedId = ((state.ui as any)?.selectedEventId ?? firstId ?? null) as
-    | string
-    | null;
+  const selectedId = ((state.ui as any)?.selectedEventId ??
+    firstId ??
+    null) as string | null;
 
   return (
     <section
@@ -44,16 +44,13 @@ export default function Slide03FinanceCalendar({
         h-[calc(100vh-120px)]
         overflow-hidden
 
-        /* Break out of any parent max-width on XL so the calendar can expand */
         xl:w-screen xl:max-w-none
         xl:relative xl:left-1/2 xl:-translate-x-1/2
         xl:px-8
 
-        /* --- LG: 2 rows (PDF + Editor top), Calendar full-width bottom --- */
         lg:grid-cols-[minmax(340px,400px)_minmax(360px,420px)_minmax(0,1fr)]
         lg:grid-rows-[auto_minmax(0,1fr)]
 
-        /* --- XL: 3 columns, 1 row (PDF | Calendar | Editor) --- */
         xl:grid-cols-[minmax(340px,400px)_minmax(0,1fr)_minmax(360px,420px)]
         xl:grid-rows-1
       "
@@ -76,26 +73,19 @@ export default function Slide03FinanceCalendar({
           lg:max-h-[42vh] lg:overflow-y-auto
           xl:max-h-none xl:h-full xl:overflow-y-auto
 
-          /* place this as col 2 row 1 on lg */
           lg:col-start-2 lg:row-start-1
-
-          /* on xl it becomes col 3 row 1 */
           xl:col-start-3 xl:row-start-1
         "
       >
         <EventEditor state={state} setState={setState} selectedId={selectedId} />
       </div>
 
-      {/* MIDDLE: CALENDAR (full width on LG, center column on XL) */}
+      {/* MIDDLE: CALENDAR */}
       <div
         className="
           min-w-0 min-h-0 overflow-x-hidden overscroll-contain
           h-full overflow-y-auto
-
-          /* LG: calendar spans all 3 columns on row 2 */
           lg:col-span-3 lg:row-start-2
-
-          /* XL: calendar is the middle column */
           xl:col-start-2 xl:row-start-1 xl:col-span-1
         "
       >
