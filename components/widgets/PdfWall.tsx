@@ -43,27 +43,29 @@ export default function PdfWall({
     };
 
     const immediate = [base, ...docs];
-    setState(setPdfDocs(state, immediate));
+    setState((prev) => setPdfDocs(prev, immediate));
 
     // 3) attempt extraction locally (same behavior as before)
     try {
       const extracted = await extractTotalRequestedAmount(file);
-      const next = immediate.map((d) => (d.id === base.id ? { ...d, extractedTotal: extracted ?? undefined } : d));
-      setState(setPdfDocs(state, next));
+      const next = immediate.map((d) =>
+        d.id === base.id ? { ...d, extractedTotal: extracted ?? undefined } : d
+      );
+      setState((prev) => setPdfDocs(prev, next));
     } catch {}
-  }
 
-  function updateDoc(id: string, patch: Partial<PdfDoc>) {
-    const next = docs.map((d) => (d.id === id ? { ...d, ...patch } : d));
-    setState(setPdfDocs(state, next));
-  }
+    function updateDoc(id: string, patch: Partial<PdfDoc>) {
+      const next = docs.map((d) => (d.id === id ? { ...d, ...patch } : d));
+      setState((prev) => setPdfDocs(prev, next));
+    }
 
-  function removeDoc(id: string) {
-    const next = docs.filter((x) => x.id !== id);
-    setState(setPdfDocs(state, next));
-    if (open?.id === id) setOpen(null);
-    // optional: you can also delete from storage later if you want (not required)
-  }
+    function removeDoc(id: string) {
+      const next = docs.filter((x) => x.id !== id);
+      setState((prev) => setPdfDocs(prev, next));
+      if (open?.id === id) setOpen(null);
+      // optional: you can also delete from storage later if you want (not required)
+    }
+
 
   return (
     <div className="w-full min-w-0 rounded-3xl border border-white/10 bg-white/[0.03] p-6">

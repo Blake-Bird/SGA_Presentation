@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { AppState, SgaEvent } from "@/lib/types";
+import React, { useMemo, useRef, useState } from "react";
+import type { AppState, SgaEvent } from "@/lib/types";
 import { addEvent, updateEvent } from "@/lib/store";
 
 function tzOffsetISO() {
@@ -60,8 +60,6 @@ export default function CalendarDrag({
   days?: number;
   onSelectEvent?: (id: string) => void;
 }) {
-  
-
   const [startISO, setStartISO] = useState(windowStart);
   const startDate = useMemo(() => new Date(startISO + "T00:00:00"), [startISO]);
 
@@ -85,7 +83,8 @@ export default function CalendarDrag({
     [state.events]
   );
 
-  const [dragId, setDragId] = useState<string | null>(null);
+  // ✅ DO NOT use React state for drag id (rerender during drag can cancel it)
+  const dragIdRef = useRef<string | null>(null);
 
   function placeEventOnDay(eventId: string, day: Date) {
     const isoDate = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(
@@ -94,13 +93,14 @@ export default function CalendarDrag({
     const startLocal = `${isoDate}T18:00`;
     const endLocal = `${isoDate}T20:00`;
 
-    setState(
-      updateEvent(state, eventId, {
+    setState((prev) =>
+      updateEvent(prev, eventId, {
         start: toISOFromLocalInput(startLocal),
         end: toISOFromLocalInput(endLocal),
       })
     );
     onSelectEvent?.(eventId);
+
   }
 
   function createNewEvent() {
@@ -175,14 +175,23 @@ export default function CalendarDrag({
             <DragChip
               key={e.id}
               e={e}
-              onDragStart={() => setDragId(e.id)}
+              onDragStart={(ev) => {
+                // ✅ Required by some browsers; also avoids state updates
+                dragIdRef.current = e.id;
+                try {
+                  ev.dataTransfer.setData("text/plain", e.id);
+                  ev.dataTransfer.effectAllowed = "move";
+                } catch {}
+              }}
+              onDragEnd={() => {
+                dragIdRef.current = null;
+              }}
               onClick={() => onSelectEvent?.(e.id)}
             />
           ))}
         </div>
       </div>
 
-      {/* ✅ KEY FIX: don't "squish" the 7-col grid; allow horizontal scroll instead */}
       <div className="mt-6 overflow-x-auto overscroll-x-contain pb-2">
         <div className="grid grid-cols-7 gap-3 min-w-[980px]">
           {daysArr.map((d) => {
@@ -200,10 +209,29 @@ export default function CalendarDrag({
               <div
                 key={d.toDateString()}
                 className="rounded-2xl border border-white/10 bg-black/20 p-3 min-h-[150px] overflow-hidden"
-                onDragOver={(ev) => ev.preventDefault()}
-                onDrop={() => {
-                  if (dragId) placeEventOnDay(dragId, d);
-                  setDragId(null);
+                onDragOver={(ev) => {
+                  // ✅ Must preventDefault for drop to fire
+                  ev.preventDefault();
+                  try {
+                    ev.dataTransfer.dropEffect = "move";
+                  } catch {}
+                }}
+                onDrop={(ev) => {
+                  ev.preventDefault();
+
+                  // ✅ Prefer dataTransfer (works even if ref got cleared)
+                  let id =
+                    ((): string | null => {
+                      try {
+                        return ev.dataTransfer.getData("text/plain") || null;
+                      } catch {
+                        return null;
+                      }
+                    })() ?? dragIdRef.current;
+
+                  if (id) placeEventOnDay(id, d);
+
+                  dragIdRef.current = null;
                 }}
               >
                 <div className="text-xs text-white/70">
@@ -219,7 +247,7 @@ export default function CalendarDrag({
                       className={`w-full text-left rounded-xl border px-3 py-2 hover:brightness-110 transition ${statusClass(
                         e.status
                       )}`}
-                      title={e.title} // ✅ hover shows full title
+                      title={e.title}
                     >
                       <div className="text-sm font-semibold text-white leading-tight line-clamp-2 break-words">
                         {e.title}
@@ -240,17 +268,21 @@ export default function CalendarDrag({
 function DragChip({
   e,
   onDragStart,
+  onDragEnd,
   onClick,
 }: {
   e: SgaEvent;
-  onDragStart: () => void;
+  onDragStart: (ev: React.DragEvent<HTMLDivElement>) => void;
+  onDragEnd: () => void;
   onClick: () => void;
 }) {
   const count = Number(e.plannedCount ?? 1);
+
   return (
     <div
       draggable
       onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
       onClick={onClick}
       className={`cursor-grab active:cursor-grabbing select-none rounded-full border px-3 py-2 hover:brightness-110 transition ${statusClass(
         e.status

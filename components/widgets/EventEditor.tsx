@@ -78,12 +78,11 @@ export default function EventEditor({
   const count = Number(event.plannedCount ?? 1);
 
   function patch(p: Partial<SgaEvent>) {
-    setState(updateEvent(state, event.id, p));
+    setState((prev) => updateEvent(prev, event.id, p));
   }
-
   function del() {
     if (!confirm(`Delete "${event.title}"?`)) return;
-    setState(removeEvent(state, event.id));
+    setState((prev) => removeEvent(prev, event.id));
   }
 
   const checklist = event.checklist ?? [];

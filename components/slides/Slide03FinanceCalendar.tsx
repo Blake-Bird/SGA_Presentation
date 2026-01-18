@@ -21,13 +21,14 @@ export default function Slide03FinanceCalendar({
   useEffect(() => {
     const current = (state.ui as any)?.selectedEventId ?? null;
     if (!current && firstId) {
-      setState({
-        ...state,
+      setState((prev) => ({
+        ...prev,
         ui: {
-          ...(state.ui || ({ activeSlide: 2 } as any)),
+          ...((prev.ui || ({ activeSlide: 2 } as any)) as any),
           selectedEventId: firstId,
         } as any,
-      });
+      }));
+
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstId]);
@@ -105,14 +106,15 @@ export default function Slide03FinanceCalendar({
           windowStart="2026-01-18"
           days={130}
           onSelectEvent={(id) =>
-            setState({
-              ...state,
+            setState((prev) => ({
+              ...prev,
               ui: {
-                ...(state.ui || ({ activeSlide: 2 } as any)),
+                ...((prev.ui || ({ activeSlide: 2 } as any)) as any),
                 selectedEventId: id,
               } as any,
-            })
+            }))
           }
+
         />
       </div>
     </section>
