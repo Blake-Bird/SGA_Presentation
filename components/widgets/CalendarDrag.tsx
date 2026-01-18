@@ -87,21 +87,28 @@ export default function CalendarDrag({
   const dragIdRef = useRef<string | null>(null);
 
   function placeEventOnDay(eventId: string, day: Date) {
-    const isoDate = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(
-      day.getDate()
-    ).padStart(2, "0")}`;
-    const startLocal = `${isoDate}T18:00`;
-    const endLocal = `${isoDate}T20:00`;
+  // ✅ lock cloud snapshots briefly so drop doesn't get reverted
+  try {
+    (window as any).__SGA_SET_DRAG_LOCK__?.(1200);
+  } catch {}
 
-    setState((prev) =>
-      updateEvent(prev, eventId, {
-        start: toISOFromLocalInput(startLocal),
-        end: toISOFromLocalInput(endLocal),
-      })
-    );
-    onSelectEvent?.(eventId);
+  const isoDate = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(
+    day.getDate()
+  ).padStart(2, "0")}`;
+  const startLocal = `${isoDate}T18:00`;
+  const endLocal = `${isoDate}T20:00`;
 
-  }
+  // ✅ FUNCTIONAL setState = always uses latest state
+  setState((prev) =>
+    updateEvent(prev, eventId, {
+      start: toISOFromLocalInput(startLocal),
+      end: toISOFromLocalInput(endLocal),
+    })
+  );
+
+  onSelectEvent?.(eventId);
+}
+
 
   function createNewEvent() {
     const title = prompt("New event name?");
