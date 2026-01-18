@@ -100,11 +100,21 @@ export async function writeRoomState(
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase.from("room_state").upsert(payload, {
-    onConflict: "room_id",
-  });
+  // 1) try update (fast path)
+  const { data: updated, error: updErr } = await supabase
+    .from("room_state")
+    .update(payload)
+    .eq("room_id", roomId)
+    .select("room_id");
 
-  if (error) throw error;
+  if (updErr) throw updErr;
+
+  // if row existed, we’re done
+  if (updated && updated.length > 0) return;
+
+  // 2) otherwise insert (row didn’t exist yet)
+  const { error: insErr } = await supabase.from("room_state").insert(payload);
+  if (insErr) throw insErr;
 }
 
 /**

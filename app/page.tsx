@@ -31,7 +31,7 @@ export default function Page() {
 
   const applyingRemote = useRef(false);
   const lastSeenRemoteUpdatedAt = useRef<number>(0);
-  const ignoreRemoteUntilMs = useRef<number>(0);
+  
 
 
   // ✅ local drag lock to prevent cloud snapshot from undoing drop
@@ -60,89 +60,124 @@ export default function Page() {
     };
   }, []);
 
-  // ✅ load local state AFTER mount (kills hydration mismatch)
-  useEffect(() => {
-    setMounted(true);
-    const local = loadLocalState();
-    setState(local);
-  }, []);
+// ✅ mount flag
+useEffect(() => {
+  setMounted(true);
+}, []);
 
-  // ✅ Subscribe to shared room
-  useEffect(() => {
-    if (!mounted) return;
+// ✅ Subscribe FIRST (remote-first). If no remote row exists, fall back to local.
+useEffect(() => {
+  if (!mounted) return;
 
-    const unsub = subscribeRoomState(roomId, (remote) => {
-      if (!remote?.state) return;
+  let didReceiveAnyRemote = false;
 
-      // ✅ ignore snapshots while a drag/drop just happened
-      if (Date.now() < dragLockUntilMs.current) return;
-      if (Date.now() < ignoreRemoteUntilMs.current) return;
+  const unsub = subscribeRoomState(roomId, async (remote) => {
+    // If no row exists yet: seed from local once.
+    if (!remote?.state) {
+      if (didReceiveAnyRemote) return;
 
+      const local = loadLocalState();
+      setState(local);
 
-      const remoteUpdatedAt = remote.__meta?.updatedAtMs ?? 0;
+      // create/seed the room so others instantly see it
+      try {
+        await writeRoomState(roomId, local, {
+          clientId,
+          updatedAtMs: Date.now(),
+        });
+      } catch {}
 
-      // ✅ Ignore older snapshots
-      if (remoteUpdatedAt && remoteUpdatedAt <= lastSeenRemoteUpdatedAt.current) return;
+      return;
+    }
 
-      // ✅ If *we* wrote it, don't re-apply it
-      if (remote.__meta?.updatedBy && remote.__meta.updatedBy === clientId) {
-        lastSeenRemoteUpdatedAt.current = remoteUpdatedAt;
-        return;
-      }
+    didReceiveAnyRemote = true;
 
+    // don't let a remote snapshot immediately undo a drag/drop
+    
+
+    const remoteUpdatedAt = remote.__meta?.updatedAtMs ?? 0;
+
+    // ignore older snapshots
+    if (remoteUpdatedAt && remoteUpdatedAt <= lastSeenRemoteUpdatedAt.current) return;
+
+    // if we wrote it, we can skip re-applying (prevents flicker)
+    if (remote.__meta?.updatedBy && remote.__meta.updatedBy === clientId) {
       lastSeenRemoteUpdatedAt.current = remoteUpdatedAt;
+      return;
+    }
 
-      applyingRemote.current = true;
+    lastSeenRemoteUpdatedAt.current = remoteUpdatedAt;
 
-      // ✅ Apply shared data but preserve local UI
-      setState((prev) => {
-        const merged: AppState = {
-          ...(remote.state as any),
-          ui: prev.ui,
-        };
-        try {
-          saveLocalState(merged);
-        } catch {}
-        return merged;
-      });
+    applyingRemote.current = true;
 
-      setTimeout(() => {
-        applyingRemote.current = false;
-      }, 0);
+    setState((prev) => {
+      const merged: AppState = {
+        ...(remote.state as any), // shared state
+        ui: prev.ui,              // keep local-only UI
+      };
+      try {
+        saveLocalState(merged);
+      } catch {}
+      return merged;
     });
 
-    return () => unsub();
-  }, [roomId, clientId, mounted]);
+    // release the "remote applying" guard next tick
+    queueMicrotask(() => {
+      applyingRemote.current = false;
+    });
+  });
 
-  // ✅ Autosave local + cloud
-  useEffect(() => {
-    if (!mounted) return;
+  return () => unsub();
+}, [roomId, clientId, mounted]);
 
-    try {
-      saveLocalState(state);
-    } catch {}
+  // ✅ Autosave local + cloud (fast = realtime)
+useEffect(() => {
+  if (!mounted) return;
 
+  try {
+    saveLocalState(state);
+  } catch {}
+
+  if (applyingRemote.current) return;
+
+  const t = setTimeout(() => {
+    writeRoomState(roomId, state, {
+      clientId,
+      updatedAtMs: Date.now(),
+    }).catch((err) => {
+      console.error("writeRoomState failed:", err);
+    });
+  }, 150);
+
+  return () => clearTimeout(t);
+}, [state, roomId, clientId, mounted]);
+
+// ✅ best-effort flush when user closes/tab-switches
+useEffect(() => {
+  if (!mounted) return;
+
+  const flush = () => {
     if (applyingRemote.current) return;
+    writeRoomState(roomId, state, {
+      clientId,
+      updatedAtMs: Date.now(),
+    }).catch(() => {});
+  };
 
-    const t = setTimeout(() => {
-      writeRoomState(roomId, state, {
-        clientId,
-        updatedAtMs: Date.now(),
-      }).catch((err) => {
-        console.error("writeRoomState failed:", err);
-      });
-    }, 1200); // ✅ slightly slower = fewer races
+  window.addEventListener("beforeunload", flush);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flush();
+  });
 
-    return () => clearTimeout(t);
-  }, [state, roomId, clientId, mounted]);
+  return () => {
+    window.removeEventListener("beforeunload", flush);
+  };
+}, [roomId, clientId, state, mounted]);
 
   // ✅ don't render until mounted to avoid hydration mismatch
   if (!mounted) return null;
 
   const setStateLocked = (updater: any) => {
-    // ignore remote snapshots for a short window after local edits
-    ignoreRemoteUntilMs.current = Date.now() + 900;
-
     setState((prev) => (typeof updater === "function" ? updater(prev) : updater));
   };
 
