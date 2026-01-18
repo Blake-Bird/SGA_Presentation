@@ -9,7 +9,7 @@ type RoomDoc = {
   };
 };
 
-// same logic: don't sync ui
+// don't sync ui (local-only)
 function stripUi(state: AppState): AppState {
   const { ui, ...rest } = state as any;
   return rest as AppState;
@@ -37,7 +37,6 @@ export function subscribeRoomState(
     if (cancelled) return;
 
     if (error || !data) {
-      // if no row yet, treat as empty
       cb(null);
     } else {
       cb({
@@ -76,7 +75,6 @@ export function subscribeRoomState(
     )
     .subscribe();
 
-  // return unsubscribe
   return () => {
     cancelled = true;
     supabase.removeChannel(channel);
@@ -85,7 +83,7 @@ export function subscribeRoomState(
 
 /**
  * Persist latest state into Postgres.
- * (This is the Firestore setDoc equivalent.)
+ * Uses UPSERT so the row is created if missing.
  */
 export async function writeRoomState(
   roomId: string,
@@ -105,23 +103,6 @@ export async function writeRoomState(
   });
 
   if (error) throw error;
-}
-
-  // 1) try update (fast path)
-  const { data: updated, error: updErr } = await supabase
-    .from("room_state")
-    .update(payload)
-    .eq("room_id", roomId)
-    .select("room_id");
-
-  if (updErr) throw updErr;
-
-  // if row existed, we’re done
-  if (updated && updated.length > 0) return;
-
-  // 2) otherwise insert (row didn’t exist yet)
-  const { error: insErr } = await supabase.from("room_state").insert(payload);
-  if (insErr) throw insErr;
 }
 
 /**
@@ -146,7 +127,6 @@ export async function uploadPdfToRoom(roomId: string, file: File) {
 
   if (upErr) throw upErr;
 
-  // Public URL (bucket must be public)
   const { data } = supabase.storage.from("room-pdfs").getPublicUrl(path);
   const url = data.publicUrl;
 
