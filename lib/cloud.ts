@@ -11,6 +11,7 @@ import {
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 type RoomDoc = {
+  // IMPORTANT: this is "shared state" (no per-user UI)
   state: AppState;
   __meta?: {
     updatedAtMs?: number;
@@ -24,6 +25,15 @@ const ROOM_ID = "default";
 // Firestore doc location
 function roomDocRef() {
   return doc(db, "rooms", ROOM_ID);
+}
+
+/**
+ * Strip UI fields so one client cannot "drive" other clients
+ * (slide changes, selected event, etc.)
+ */
+function stripUi(state: AppState): AppState {
+  const { ui, ...rest } = state as any;
+  return rest as AppState;
 }
 
 /**
@@ -45,8 +55,8 @@ export function subscribeRoomState(
 }
 
 /**
- * Write the full state to the shared room.
- * This is what makes "no save button" possible.
+ * Write the shared state to the shared room.
+ * NOTE: We intentionally DO NOT sync `state.ui`.
  */
 export async function writeRoomState(
   _roomId: string,
@@ -56,12 +66,11 @@ export async function writeRoomState(
   await setDoc(
     roomDocRef(),
     {
-      state,
+      state: stripUi(state),
       __meta: {
         updatedAtMs: meta.updatedAtMs,
         updatedBy: meta.clientId,
       },
-      // keeps a server-side time too (nice for debugging)
       _serverUpdatedAt: serverTimestamp(),
     } as any,
     { merge: true }
@@ -71,15 +80,23 @@ export async function writeRoomState(
 /**
  * Upload a PDF to shared storage and return url + storagePath.
  * PdfWall calls this, then puts url into state so everyone sees it instantly.
+ *
+ * NOTE: Firebase Storage may require billing. If disabled, this will throw.
  */
 export async function uploadPdfToRoom(_roomId: string, file: File) {
+  if (!storage) {
+    throw new Error("Firebase Storage is not configured/enabled for this project.");
+  }
+
   const id =
-    (crypto as any)?.randomUUID?.() ?? `pdf_${Math.random().toString(16).slice(2)}`;
+    (crypto as any)?.randomUUID?.() ??
+    `pdf_${Math.random().toString(16).slice(2)}`;
 
   const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");
   const storagePath = `rooms/${ROOM_ID}/pdfs/${id}/${safeName}`;
 
   const fileRef = ref(storage, storagePath);
+
   await uploadBytes(fileRef, file, {
     contentType: file.type || "application/pdf",
   });

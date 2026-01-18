@@ -28,7 +28,9 @@ export default function Page() {
     const k = "sga_client_id_v1";
     const existing = localStorage.getItem(k);
     if (existing) return existing;
-    const fresh = (crypto as any)?.randomUUID?.() ?? `id_${Math.random().toString(16).slice(2)}`;
+    const fresh =
+      (crypto as any)?.randomUUID?.() ??
+      `id_${Math.random().toString(16).slice(2)}`;
     localStorage.setItem(k, fresh);
     return fresh;
   }, []);
@@ -36,19 +38,29 @@ export default function Page() {
   // Subscribe to shared room state (realtime)
   useEffect(() => {
     const unsub = subscribeRoomState(roomId, (remote) => {
-      if (!remote) return;
+      if (!remote?.state) return;
 
       const remoteUpdatedAt = remote.__meta?.updatedAtMs ?? 0;
       if (remoteUpdatedAt && remoteUpdatedAt <= lastSeenRemoteUpdatedAt.current) return;
-
       lastSeenRemoteUpdatedAt.current = remoteUpdatedAt;
 
       applyingRemote.current = true;
-      setState(remote.state);
-      // also keep local backup in sync
-      try {
-        saveLocalState(remote.state);
-      } catch {}
+
+      // ✅ Merge remote shared state but keep local UI so one user doesn't control others
+      setState((prev) => {
+        const merged: AppState = {
+          ...(remote.state as any), // shared data from cloud (NO ui)
+          ui: prev.ui,              // keep THIS device's UI (slide selection, selectedEventId)
+        };
+
+        // also keep local backup in sync (shared data persists across reload)
+        try {
+          saveLocalState(merged);
+        } catch {}
+
+        return merged;
+      });
+
       // release lock next tick
       setTimeout(() => {
         applyingRemote.current = false;
@@ -68,13 +80,13 @@ export default function Page() {
     // If we just applied a remote snapshot, don't echo it back.
     if (applyingRemote.current) return;
 
-    // Debounced cloud save
+    // Debounced cloud save (cloud.ts strips ui automatically)
     const t = setTimeout(() => {
       writeRoomState(roomId, state, {
         clientId,
         updatedAtMs: Date.now(),
-      }).catch(() => {
-        // ignore; local autosave still works
+      }).catch((err) => {
+        console.error("writeRoomState failed:", err);
       });
     }, 250);
 
