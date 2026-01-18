@@ -11,7 +11,7 @@ export default function Slide03FinanceCalendar({
   setState,
 }: {
   state: AppState;
-  setState: (s: AppState) => void;
+  setState: React.Dispatch<React.SetStateAction<AppState>>;
 }) {
   const firstId = useMemo(
     () => (state.events?.[0]?.id ? state.events[0].id : null),
@@ -28,14 +28,13 @@ export default function Slide03FinanceCalendar({
           selectedEventId: firstId,
         } as any,
       }));
-
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [firstId]);
 
-  const selectedId = ((state.ui as any)?.selectedEventId ??
-    firstId ??
-    null) as string | null;
+  const selectedId = ((state.ui as any)?.selectedEventId ?? firstId ?? null) as
+    | string
+    | null;
 
   return (
     <section
@@ -114,7 +113,6 @@ export default function Slide03FinanceCalendar({
               } as any,
             }))
           }
-
         />
       </div>
     </section>

@@ -1,106 +1,122 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import type { AppState } from "@/lib/types";
+import PdfWall from "@/components/widgets/PdfWall";
+import CalendarDrag from "@/components/widgets/CalendarDrag";
+import EventEditor from "@/components/widgets/EventEditor";
 
-import Slide01Overview from "@/components/slides/Slide01Overview";
-import Slide02Social from "@/components/slides/Slide02Social";
-import Slide03FinanceCalendar from "@/components/slides/Slide03FinanceCalendar";
-import Slide04Export from "@/components/slides/Slide04Export";
-
-import {
-  computeSpent,
-  remainingBudget,
-  setActiveSlide,
-  downloadState,
-  importStateFromFile,
-} from "@/lib/store";
-
-export default function PresentationOS({
+export default function Slide03FinanceCalendar({
   state,
   setState,
 }: {
   state: AppState;
   setState: (s: AppState) => void;
 }) {
-  const spent = computeSpent(state);
-  const remaining = remainingBudget(state);
-  const slide = state.ui?.activeSlide ?? 0;
+  const firstId = useMemo(
+    () => (state.events?.[0]?.id ? state.events[0].id : null),
+    [state.events]
+  );
+
+  useEffect(() => {
+    const current = (state.ui as any)?.selectedEventId ?? null;
+    if (!current && firstId) {
+      setState((prev) => ({
+        ...prev,
+        ui: {
+          ...((prev.ui || ({ activeSlide: 2 } as any)) as any),
+          selectedEventId: firstId,
+        } as any,
+      }));
+
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstId]);
+
+  const selectedId = ((state.ui as any)?.selectedEventId ??
+    firstId ??
+    null) as string | null;
 
   return (
-    <main className="min-h-screen text-white">
-      <div className="sticky top-0 z-50 border-b border-white/10 bg-black/50 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4">
-          <div className="min-w-0">
-            <div className="text-sm text-white/60 truncate">SGA • Live Presentation OS</div>
-          </div>
+    <section
+      className="
+        w-full min-w-0
+        grid grid-cols-1 gap-6 items-start
+        h-[calc(100vh-120px)]
+        overflow-hidden
 
-          <div className="flex items-center gap-6 text-sm flex-wrap justify-end">
-            <div className="text-white/70">
-              Total Budget:{" "}
-              <span className="font-semibold text-white">
-                ${Number(state.totalBudget || 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="text-white/70">
-              Spent:{" "}
-              <span className="font-semibold text-white">
-                ${Number(spent || 0).toFixed(2)}
-              </span>
-            </div>
-            <div className="text-white/70">
-              Remaining:{" "}
-              <span className="font-semibold text-white">
-                ${Number(remaining || 0).toFixed(2)}
-              </span>
-            </div>
-          </div>
+        /* Break out of any parent max-width on XL so the calendar can expand */
+        xl:w-screen xl:max-w-none
+        xl:relative xl:left-1/2 xl:-translate-x-1/2
+        xl:px-8
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => downloadState(state)}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-            >
-              Export
-            </button>
+        /* --- LG: 2 rows (PDF + Editor top), Calendar full-width bottom --- */
+        lg:grid-cols-[minmax(340px,400px)_minmax(360px,420px)_minmax(0,1fr)]
+        lg:grid-rows-[auto_minmax(0,1fr)]
 
-            <button
-              onClick={async () => {
-                const imported = await importStateFromFile();
-                if (!imported) {
-                  alert("Invalid or cancelled file.");
-                  return;
-                }
-                setState(imported);
-              }}
-              className="rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm hover:bg-white/10"
-            >
-              Import
-            </button>
-
-            {[0, 1, 2, 3].map((i) => (
-              <button
-                key={i}
-                onClick={() => setState(setActiveSlide(state, i))}
-                className={`h-10 w-10 rounded-full border text-sm transition ${
-                  slide === i
-                    ? "border-white/30 bg-white/10"
-                    : "border-white/10 bg-white/5 hover:bg-white/10"
-                }`}
-              >
-                {i + 1}
-              </button>
-            ))}
-          </div>
-        </div>
+        /* --- XL: 3 columns, 1 row (PDF | Calendar | Editor) --- */
+        xl:grid-cols-[minmax(340px,400px)_minmax(0,1fr)_minmax(360px,420px)]
+        xl:grid-rows-1
+      "
+    >
+      {/* LEFT: PDF */}
+      <div
+        className="
+          min-w-0 overflow-x-hidden overscroll-contain
+          lg:max-h-[42vh] lg:overflow-y-auto
+          xl:max-h-none xl:h-full xl:overflow-y-auto
+        "
+      >
+        <PdfWall state={state} setState={setState} />
       </div>
 
-      <div className="mx-auto max-w-[1400px] px-6 py-10">
-        {slide === 0 && <Slide01Overview state={state} setState={setState} />}
-        {slide === 1 && <Slide02Social state={state} setState={setState} />}
-        {slide === 2 && <Slide03FinanceCalendar state={state} setState={setState} />}
-        {slide === 3 && <Slide04Export state={state} setState={setState} />}
+      {/* RIGHT (on LG): EVENT EDITOR */}
+      <div
+        className="
+          min-w-0 overflow-x-hidden overscroll-contain
+          lg:max-h-[42vh] lg:overflow-y-auto
+          xl:max-h-none xl:h-full xl:overflow-y-auto
+
+          /* place this as col 2 row 1 on lg */
+          lg:col-start-2 lg:row-start-1
+
+          /* on xl it becomes col 3 row 1 */
+          xl:col-start-3 xl:row-start-1
+        "
+      >
+        <EventEditor state={state} setState={setState} selectedId={selectedId} />
       </div>
-    </main>
+
+      {/* MIDDLE: CALENDAR (full width on LG, center column on XL) */}
+      <div
+        className="
+          min-w-0 min-h-0 overflow-x-hidden overscroll-contain
+          h-full overflow-y-auto
+
+          /* LG: calendar spans all 3 columns on row 2 */
+          lg:col-span-3 lg:row-start-2
+
+          /* XL: calendar is the middle column */
+          xl:col-start-2 xl:row-start-1 xl:col-span-1
+        "
+      >
+        <CalendarDrag
+          state={state}
+          setState={setState}
+          windowStart="2026-01-18"
+          days={130}
+          onSelectEvent={(id) =>
+            setState((prev) => ({
+              ...prev,
+              ui: {
+                ...((prev.ui || ({ activeSlide: 2 } as any)) as any),
+                selectedEventId: id,
+              } as any,
+            }))
+          }
+
+        />
+      </div>
+    </section>
   );
 }

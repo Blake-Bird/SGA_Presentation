@@ -10,7 +10,7 @@ export default function PdfWall({
   setState,
 }: {
   state: AppState;
-  setState: (s: AppState) => void;
+  setState: React.Dispatch<React.SetStateAction<AppState>>;
 }) {
   const docs = state.pdfWall?.docs ?? [];
   const [open, setOpen] = useState<PdfDoc | null>(null);

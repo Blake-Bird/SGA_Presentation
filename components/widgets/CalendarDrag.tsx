@@ -55,7 +55,7 @@ export default function CalendarDrag({
   onSelectEvent,
 }: {
   state: AppState;
-  setState: (s: AppState) => void;
+  setState: React.Dispatch<React.SetStateAction<AppState>>;
   windowStart?: string;
   days?: number;
   onSelectEvent?: (id: string) => void;

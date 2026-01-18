@@ -56,7 +56,7 @@ export default function EventEditor({
   selectedId,
 }: {
   state: AppState;
-  setState: (s: AppState) => void;
+  setState: React.Dispatch<React.SetStateAction<AppState>>;
   selectedId?: string | null;
 }) {
   
