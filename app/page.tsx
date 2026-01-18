@@ -31,6 +31,8 @@ export default function Page() {
 
   const applyingRemote = useRef(false);
   const lastSeenRemoteUpdatedAt = useRef<number>(0);
+  const ignoreRemoteUntilMs = useRef<number>(0);
+
 
   // ✅ local drag lock to prevent cloud snapshot from undoing drop
   const dragLockUntilMs = useRef<number>(0);
@@ -74,6 +76,8 @@ export default function Page() {
 
       // ✅ ignore snapshots while a drag/drop just happened
       if (Date.now() < dragLockUntilMs.current) return;
+      if (Date.now() < ignoreRemoteUntilMs.current) return;
+
 
       const remoteUpdatedAt = remote.__meta?.updatedAtMs ?? 0;
 
@@ -127,7 +131,7 @@ export default function Page() {
       }).catch((err) => {
         console.error("writeRoomState failed:", err);
       });
-    }, 500); // ✅ slightly slower = fewer races
+    }, 900); // ✅ slightly slower = fewer races
 
     return () => clearTimeout(t);
   }, [state, roomId, clientId, mounted]);
@@ -135,5 +139,13 @@ export default function Page() {
   // ✅ don't render until mounted to avoid hydration mismatch
   if (!mounted) return null;
 
-  return <PresentationOS state={state} setState={setState} />;
+  const setStateLocked = (updater: any) => {
+    // ignore remote snapshots for a short window after local edits
+    ignoreRemoteUntilMs.current = Date.now() + 900;
+
+    setState((prev) => (typeof updater === "function" ? updater(prev) : updater));
+  };
+
+  return <PresentationOS state={state} setState={setStateLocked} />;
+
 }
