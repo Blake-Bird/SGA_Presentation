@@ -22,6 +22,14 @@ export default function Page() {
   const applyingRemote = useRef(false);
   const lastSeenRemoteUpdatedAt = useRef<number>(0);
 
+  // Prevent "UI-only" changes from writing shared state and reverting others
+  const lastSentSharedJson = useRef<string>("");
+
+  function sharedStateOnly(s: AppState) {
+    const { ui, ...rest } = s as any;
+    return rest;
+  }
+
   // Stable client id for "updatedBy"
   const clientId = useMemo(() => {
     if (typeof window === "undefined") return "server";
@@ -41,7 +49,11 @@ export default function Page() {
       if (!remote?.state) return;
 
       const remoteUpdatedAt = remote.__meta?.updatedAtMs ?? 0;
-      if (remoteUpdatedAt && remoteUpdatedAt <= lastSeenRemoteUpdatedAt.current) return;
+      if (
+        remoteUpdatedAt &&
+        remoteUpdatedAt <= lastSeenRemoteUpdatedAt.current
+      )
+        return;
       lastSeenRemoteUpdatedAt.current = remoteUpdatedAt;
 
       applyingRemote.current = true;
@@ -50,12 +62,17 @@ export default function Page() {
       setState((prev) => {
         const merged: AppState = {
           ...(remote.state as any), // shared data from cloud (NO ui)
-          ui: prev.ui,              // keep THIS device's UI (slide selection, selectedEventId)
+          ui: prev.ui, // keep THIS device's UI (slide selection, selectedEventId)
         };
 
         // also keep local backup in sync (shared data persists across reload)
         try {
           saveLocalState(merged);
+        } catch {}
+
+        // Keep our "last sent" fingerprint aligned with the latest shared snapshot
+        try {
+          lastSentSharedJson.current = JSON.stringify(sharedStateOnly(merged));
         } catch {}
 
         return merged;
@@ -80,14 +97,39 @@ export default function Page() {
     // If we just applied a remote snapshot, don't echo it back.
     if (applyingRemote.current) return;
 
+    // ✅ Only write when SHARED state changes (ignore pure UI changes)
+    let sharedJson = "";
+    try {
+      sharedJson = JSON.stringify(sharedStateOnly(state));
+    } catch {
+      // if stringify fails for any reason, fall back to writing
+      sharedJson = "";
+    }
+
+    if (sharedJson && sharedJson === lastSentSharedJson.current) return;
+
     // Debounced cloud save (cloud.ts strips ui automatically)
     const t = setTimeout(() => {
+      let currentSharedJson = "";
+      try {
+        currentSharedJson = JSON.stringify(sharedStateOnly(state));
+      } catch {
+        currentSharedJson = "";
+      }
+
+      if (currentSharedJson && currentSharedJson === lastSentSharedJson.current)
+        return;
+
       writeRoomState(roomId, state, {
         clientId,
         updatedAtMs: Date.now(),
-      }).catch((err) => {
-        console.error("writeRoomState failed:", err);
-      });
+      })
+        .then(() => {
+          if (currentSharedJson) lastSentSharedJson.current = currentSharedJson;
+        })
+        .catch((err) => {
+          console.error("writeRoomState failed:", err);
+        });
     }, 250);
 
     return () => clearTimeout(t);
