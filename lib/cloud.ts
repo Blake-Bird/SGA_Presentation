@@ -1,17 +1,7 @@
-// lib/cloud.ts
 import type { AppState } from "@/lib/types";
-import { db, storage } from "@/lib/firebase";
-import {
-  doc,
-  onSnapshot,
-  setDoc,
-  serverTimestamp,
-  type Unsubscribe,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { supabase } from "@/lib/supabase";
 
 type RoomDoc = {
-  // IMPORTANT: this is "shared state" (no per-user UI)
   state: AppState;
   __meta?: {
     updatedAtMs?: number;
@@ -19,89 +9,129 @@ type RoomDoc = {
   };
 };
 
-// Everyone uses the SAME room
-const ROOM_ID = "default";
-
-// Firestore doc location
-function roomDocRef() {
-  return doc(db, "rooms", ROOM_ID);
-}
-
-/**
- * Strip UI fields so one client cannot "drive" other clients
- * (slide changes, selected event, etc.)
- */
+// same logic: don't sync ui
 function stripUi(state: AppState): AppState {
   const { ui, ...rest } = state as any;
   return rest as AppState;
 }
 
 /**
- * Subscribe to the shared state (real-time).
- * Calls cb whenever anyone changes anything.
+ * Subscribe to shared room state:
+ * - loads initial snapshot from Postgres
+ * - listens to realtime updates from Postgres table
  */
 export function subscribeRoomState(
-  _roomId: string, // kept for compatibility with your Page.tsx
+  roomId: string,
   cb: (doc: RoomDoc | null) => void
-): Unsubscribe {
-  return onSnapshot(
-    roomDocRef(),
-    (snap) => {
-      if (!snap.exists()) return cb(null);
-      cb(snap.data() as RoomDoc);
-    },
-    () => cb(null)
-  );
+) {
+  let cancelled = false;
+
+  // 1) initial fetch
+  (async () => {
+    const { data, error } = await supabase
+      .from("room_state")
+      .select("state, updated_at_ms, updated_by")
+      .eq("room_id", roomId)
+      .maybeSingle();
+
+    if (cancelled) return;
+
+    if (error || !data) {
+      // if no row yet, treat as empty
+      cb(null);
+    } else {
+      cb({
+        state: data.state as any,
+        __meta: {
+          updatedAtMs: Number(data.updated_at_ms || 0),
+          updatedBy: data.updated_by ?? undefined,
+        },
+      });
+    }
+  })();
+
+  // 2) realtime subscription
+  const channel = supabase
+    .channel(`room_state:${roomId}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "room_state",
+        filter: `room_id=eq.${roomId}`,
+      },
+      (payload) => {
+        const row: any = payload.new;
+        if (!row?.state) return;
+
+        cb({
+          state: row.state as any,
+          __meta: {
+            updatedAtMs: Number(row.updated_at_ms || 0),
+            updatedBy: row.updated_by ?? undefined,
+          },
+        });
+      }
+    )
+    .subscribe();
+
+  // return unsubscribe
+  return () => {
+    cancelled = true;
+    supabase.removeChannel(channel);
+  };
 }
 
 /**
- * Write the shared state to the shared room.
- * NOTE: We intentionally DO NOT sync `state.ui`.
+ * Persist latest state into Postgres.
+ * (This is the Firestore setDoc equivalent.)
  */
 export async function writeRoomState(
-  _roomId: string,
+  roomId: string,
   state: AppState,
   meta: { clientId: string; updatedAtMs: number }
 ) {
-  await setDoc(
-    roomDocRef(),
-    {
-      state: stripUi(state),
-      __meta: {
-        updatedAtMs: meta.updatedAtMs,
-        updatedBy: meta.clientId,
-      },
-      _serverUpdatedAt: serverTimestamp(),
-    } as any,
-    { merge: true }
-  );
+  const payload = {
+    room_id: roomId,
+    state: stripUi(state) as any,
+    updated_at_ms: meta.updatedAtMs,
+    updated_by: meta.clientId,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase.from("room_state").upsert(payload, {
+    onConflict: "room_id",
+  });
+
+  if (error) throw error;
 }
 
 /**
- * Upload a PDF to shared storage and return url + storagePath.
- * PdfWall calls this, then puts url into state so everyone sees it instantly.
- *
- * NOTE: Firebase Storage may require billing. If disabled, this will throw.
+ * Upload PDF to Supabase Storage and return a public URL.
+ * Bucket: room-pdfs
  */
-export async function uploadPdfToRoom(_roomId: string, file: File) {
-  if (!storage) {
-    throw new Error("Firebase Storage is not configured/enabled for this project.");
-  }
-
+export async function uploadPdfToRoom(roomId: string, file: File) {
   const id =
     (crypto as any)?.randomUUID?.() ??
     `pdf_${Math.random().toString(16).slice(2)}`;
 
   const safeName = file.name.replace(/[^\w.\-() ]+/g, "_");
-  const storagePath = `rooms/${ROOM_ID}/pdfs/${id}/${safeName}`;
+  const path = `${roomId}/${id}/${safeName}`;
 
-  const fileRef = ref(storage, storagePath);
+  const { error: upErr } = await supabase.storage
+    .from("room-pdfs")
+    .upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || "application/pdf",
+    });
 
-  await uploadBytes(fileRef, file, {
-    contentType: file.type || "application/pdf",
-  });
+  if (upErr) throw upErr;
 
-  const url = await getDownloadURL(fileRef);
+  // Public URL (bucket must be public)
+  const { data } = supabase.storage.from("room-pdfs").getPublicUrl(path);
+  const url = data.publicUrl;
 
-  return { id, url, storagePath };
+  return { id, url, storagePath: path };
 }

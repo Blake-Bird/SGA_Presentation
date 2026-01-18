@@ -131,7 +131,7 @@ export default function Page() {
       }).catch((err) => {
         console.error("writeRoomState failed:", err);
       });
-    }, 900); // ✅ slightly slower = fewer races
+    }, 1200); // ✅ slightly slower = fewer races
 
     return () => clearTimeout(t);
   }, [state, roomId, clientId, mounted]);
