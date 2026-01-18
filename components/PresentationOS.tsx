@@ -96,7 +96,7 @@ export default function PresentationOS({
       </div>
 
       <div className="mx-auto max-w-[1400px] px-6 py-10">
-        {slide === 0 && <Slide01Overview state={state} setState={setState} />}
+        {slide === 0 && <Slide01Overview state={state} />}
         {slide === 1 && <Slide02Social state={state} setState={setState} />}
         {slide === 2 && <Slide03FinanceCalendar state={state} setState={setState} />}
         {slide === 3 && <Slide04Export state={state} setState={setState} />}
