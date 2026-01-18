@@ -67,3 +67,18 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Next.js
+.next
+out
+
+# Vercel
+.vercel
+
+# Env files (never commit)
+.env.local
+.env.*.local
+
+# macOS
+.DS_Store
+
