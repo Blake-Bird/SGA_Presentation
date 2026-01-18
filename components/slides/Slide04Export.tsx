@@ -1,10 +1,8 @@
 "use client";
 
 import type { AppState } from "@/lib/types";
-import { downloadState, importStateFromFile } from "@/lib/store";
+import { downloadState } from "@/lib/store";
 import { useState } from "react";
-
-
 
 export default function Slide04Export({
   state,
@@ -71,18 +69,6 @@ export default function Slide04Export({
           >
             Import JSON
           </button>
-          
-          <button
-            onClick={async () => {
-              const imported = await importStateFromFile();
-              if (imported) setState(imported);
-            }}
-            className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
-          >
-            Import from File
-          </button>
-
-
           <button
             onClick={() => setRaw("")}
             className="rounded-2xl border border-white/10 bg-white/5 px-4 py-2 text-sm font-semibold hover:bg-white/10"
@@ -93,30 +79,10 @@ export default function Slide04Export({
       </div>
 
       <div className="col-span-12 xl:col-span-5 rounded-3xl border border-white/10 bg-white/5 p-7 shadow-glow">
-        <div className="text-xs uppercase tracking-widest text-zinc-400">Meeting Checklist</div>
-        <div className="mt-2 text-2xl font-semibold tracking-tight">What to say as you drive the deck</div>
-
-        <div className="mt-5 space-y-3 text-sm text-zinc-200">
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-4">
-            <div className="font-semibold">Velvet Circle is locked.</div>
-            <div className="text-zinc-400">Jan 21 • 6PM • Panther Commons 4th Floor Ballroom • Walmart card $1,282</div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-4">
-            <div className="font-semibold">Social rollout is disciplined.</div>
-            <div className="text-zinc-400">1 post/day, share‑engineered, outfit post is the anchor.</div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-4">
-            <div className="font-semibold">Budget is transparent.</div>
-            <div className="text-zinc-400">PDF totals shown on-screen + calendar spend-down live.</div>
-          </div>
-          <div className="rounded-2xl border border-white/10 bg-zinc-950/30 p-4">
-            <div className="font-semibold">Calendar is flexible.</div>
-            <div className="text-zinc-400">We can drag dates live to fit constraints without redoing paperwork.</div>
-          </div>
-        </div>
-
-        <div className="mt-6 text-xs text-zinc-400">
-          Everything persists automatically in your browser (localStorage) so you can reopen it and it’s still updated.
+        <div className="text-xs uppercase tracking-widest text-zinc-400">Notes</div>
+        <div className="mt-2 text-2xl font-semibold tracking-tight">This is only backup/restore</div>
+        <div className="mt-3 text-sm text-zinc-300">
+          Your real-time collaboration comes from Firestore in <code>lib/cloud.ts</code>.
         </div>
       </div>
     </div>
