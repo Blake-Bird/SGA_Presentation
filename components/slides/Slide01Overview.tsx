@@ -4,7 +4,14 @@
 import React from "react";
 import { AppState } from "@/lib/types";
 
-export default function Slide01Overview({ state }: { state: AppState }) {
+export default function Slide01Overview({
+  state,
+  // kept for consistency with other slides; not used on this slide
+  setState,
+}: {
+  state: AppState;
+  setState: (s: AppState) => void;
+}) {
   const velvet = state.events.find((e) => e.title === "The Velvet Circle") || state.events[0];
 
   return (

@@ -54,22 +54,13 @@ export default function CalendarDrag({
   days = 28,
   onSelectEvent,
 }: {
-  state?: AppState;
+  state: AppState;
   setState: (s: AppState) => void;
   windowStart?: string;
   days?: number;
   onSelectEvent?: (id: string) => void;
 }) {
-  if (!state) {
-    return (
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-        <div className="text-white/80 text-lg font-semibold">Loading calendar…</div>
-        <div className="mt-2 text-white/50 text-sm">
-          If this doesn’t go away, the parent slide isn’t passing <code>state</code> correctly.
-        </div>
-      </div>
-    );
-  }
+  
 
   const [startISO, setStartISO] = useState(windowStart);
   const startDate = useMemo(() => new Date(startISO + "T00:00:00"), [startISO]);

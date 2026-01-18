@@ -55,17 +55,11 @@ export default function EventEditor({
   setState,
   selectedId,
 }: {
-  state?: AppState;
+  state: AppState;
   setState: (s: AppState) => void;
   selectedId?: string | null;
 }) {
-  if (!state) {
-    return (
-      <div className="w-full min-w-0 rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-        <div className="text-white/80 text-lg font-semibold">Loading editor…</div>
-      </div>
-    );
-  }
+  
 
   const event = useMemo(() => {
     const list = state.events || [];

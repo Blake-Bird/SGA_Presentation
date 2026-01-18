@@ -1,4 +1,7 @@
+
+
 "use client";
+import type { AppState } from "@/lib/types";
 
 const posts = [
   {
@@ -38,7 +41,14 @@ const posts = [
   },
 ];
 
-export default function Slide02Social() {
+export default function Slide02Social({
+  // kept for consistency with other slides; not used on this slide
+  state,
+  setState,
+}: {
+  state: AppState;
+  setState: (s: AppState) => void;
+}) {
   return (
     <div className="rounded-3xl border border-white/10 bg-white/5 p-7 shadow-glow">
       <div className="flex items-end justify-between gap-4">

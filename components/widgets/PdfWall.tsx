@@ -226,7 +226,7 @@ export default function PdfWall({
 
 async function extractTotalRequestedAmount(file: File): Promise<number | null> {
   const buf = await file.arrayBuffer();
-  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf");
+  const pdfjsLib = await import("pdfjs-dist/legacy/build/pdf.mjs");
   // @ts-ignore
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.js";

@@ -2,8 +2,18 @@
 
 import { AppState } from "@/lib/types";
 import { useState } from "react";
+import type { AppState } from "@/lib/types";
+import { downloadState, importStateFromFile } from "@/lib/store";
+import { useState } from "react";
 
-export default function Slide04Export({ state, actions }: { state: AppState; actions: any }) {
+
+export default function Slide04Export({
+  state,
+  setState,
+}: {
+  state: AppState;
+  setState: (s: AppState) => void;
+}) {
   const [raw, setRaw] = useState("");
 
   return (
