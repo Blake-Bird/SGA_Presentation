@@ -1,9 +1,15 @@
 "use client";
 
-import React, { useMemo, useState, useCallback } from "react";
+import React, { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import type { AppState, PdfDoc } from "@/lib/types";
 import { setPdfDocs } from "@/lib/store";
 import { uploadPdfToRoom } from "@/lib/cloud";
+
+import { Document, Page, pdfjs } from "react-pdf";
+
+// Worker for PDF.js (works on Vercel)
+pdfjs.GlobalWorkerOptions.workerSrc =
+  "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
 
 export default function PdfWall({
   state,
@@ -22,10 +28,7 @@ export default function PdfWall({
   }, []);
 
   const total = useMemo(() => {
-    return docs.reduce(
-      (sum, d) => sum + Number(d.manualTotal ?? d.extractedTotal ?? 0),
-      0
-    );
+    return docs.reduce((sum, d) => sum + Number(d.manualTotal ?? d.extractedTotal ?? 0), 0);
   }, [docs]);
 
   // ✅ always use functional updates so we never write using stale `docs/state`
@@ -64,9 +67,7 @@ export default function PdfWall({
     try {
       const extracted = await extractTotalRequestedAmount(file);
       updateDocs((prev) =>
-        prev.map((d) =>
-          d.id === base.id ? { ...d, extractedTotal: extracted ?? undefined } : d
-        )
+        prev.map((d) => (d.id === base.id ? { ...d, extractedTotal: extracted ?? undefined } : d))
       );
     } catch {
       // ignore
@@ -195,7 +196,7 @@ export default function PdfWall({
                           : "border-white/10 bg-white/3 text-white/40 cursor-not-allowed"
                       }`}
                     >
-                      {hasFile ? "Click to expand (fit page)" : "Missing file URL"}
+                      {hasFile ? "Open viewer (zoom + pages)" : "Missing file URL"}
                     </button>
                   </div>
                 </div>
@@ -212,7 +213,7 @@ export default function PdfWall({
                       <div className="p-4 text-sm text-white/60">No file available.</div>
                     )}
                     <div className="pointer-events-none absolute bottom-3 right-3 rounded-full border border-white/15 bg-black/50 px-3 py-1 text-xs text-white/80">
-                      Fit-to-page
+                      Preview
                     </div>
                   </div>
                 </div>
@@ -222,31 +223,170 @@ export default function PdfWall({
         })}
       </div>
 
-      {open && (
-        <div className="fixed inset-0 z-[2147483647] bg-black/80 backdrop-blur-sm">
-          <div className="absolute inset-0 p-5 md:p-10">
-            <div className="h-full w-full rounded-3xl border border-white/10 bg-black/70 overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-white/10">
-                <div className="text-white font-semibold min-w-0 break-words">{open.title}</div>
-                <button
-                  onClick={() => setOpen(null)}
-                  className="shrink-0 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-4 py-2 text-sm text-white"
+      {open && <PdfModal doc={open} onClose={() => setOpen(null)} />}
+    </div>
+  );
+}
+
+function PdfModal({ doc, onClose }: { doc: PdfDoc; onClose: () => void }) {
+  const [numPages, setNumPages] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
+  const [scale, setScale] = useState<number>(1.1);
+  const [fitWidth, setFitWidth] = useState<boolean>(true);
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number>(900);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const ro = new ResizeObserver(() => {
+      const w = el.getBoundingClientRect().width;
+      setContainerWidth(Math.max(320, Math.floor(w)));
+    });
+
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    setPage(1);
+    setScale(1.1);
+    setFitWidth(true);
+  }, [doc.id]);
+
+  const canPrev = page > 1;
+  const canNext = numPages > 0 && page < numPages;
+
+  return (
+    <div className="fixed inset-0 z-[2147483647] bg-black/80 backdrop-blur-sm">
+      <div className="absolute inset-0 p-4 md:p-8">
+        <div className="h-full w-full rounded-3xl border border-white/10 bg-black/70 overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between gap-3 px-4 md:px-6 py-3 border-b border-white/10">
+            <div className="min-w-0">
+              <div className="text-white font-semibold truncate">{doc.title}</div>
+              <div className="text-xs text-white/50 truncate">{doc.fileName}</div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={doc.url}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-3 py-2 text-xs text-white"
+              >
+                Open tab
+              </a>
+              <a
+                href={doc.url}
+                download
+                className="rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-3 py-2 text-xs text-white"
+              >
+                Download
+              </a>
+              <button
+                onClick={onClose}
+                className="rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-4 py-2 text-sm text-white"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 px-4 md:px-6 py-3 border-b border-white/10">
+            <button
+              disabled={!canPrev}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className={`rounded-full border px-3 py-2 text-xs ${
+                canPrev
+                  ? "border-white/15 bg-white/5 hover:bg-white/10 text-white"
+                  : "border-white/10 bg-white/3 text-white/40 cursor-not-allowed"
+              }`}
+            >
+              Prev
+            </button>
+
+            <div className="text-xs text-white/70 tabular-nums px-2">
+              Page {page} / {numPages || "—"}
+            </div>
+
+            <button
+              disabled={!canNext}
+              onClick={() => setPage((p) => Math.min(numPages || p, p + 1))}
+              className={`rounded-full border px-3 py-2 text-xs ${
+                canNext
+                  ? "border-white/15 bg-white/5 hover:bg-white/10 text-white"
+                  : "border-white/10 bg-white/3 text-white/40 cursor-not-allowed"
+              }`}
+            >
+              Next
+            </button>
+
+            <div className="mx-2 h-6 w-px bg-white/10" />
+
+            <button
+              onClick={() => {
+                setFitWidth(false);
+                setScale((s) => Math.max(0.6, Number((s - 0.1).toFixed(2))));
+              }}
+              className="rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-3 py-2 text-xs text-white"
+            >
+              −
+            </button>
+
+            <button
+              onClick={() => {
+                setFitWidth(false);
+                setScale((s) => Math.min(3.0, Number((s + 0.1).toFixed(2))));
+              }}
+              className="rounded-full border border-white/15 bg-white/5 hover:bg-white/10 px-3 py-2 text-xs text-white"
+            >
+              +
+            </button>
+
+            <button
+              onClick={() => setFitWidth(true)}
+              className={`rounded-full border px-3 py-2 text-xs ${
+                fitWidth ? "border-white/20 bg-white/10 text-white" : "border-white/15 bg-white/5 hover:bg-white/10 text-white"
+              }`}
+            >
+              Fit width
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-auto">
+            <div className="px-3 md:px-6 py-6">
+              <div
+                ref={containerRef}
+                className="mx-auto w-full max-w-[1100px] rounded-2xl border border-white/10 bg-black/40 p-3 md:p-4"
+              >
+                <Document
+                  file={doc.url}
+                  onLoadSuccess={(info) => {
+                    setNumPages(info.numPages);
+                    setPage(1);
+                  }}
+                  loading={<div className="text-white/70 text-sm p-6">Loading PDF…</div>}
+                  error={<div className="text-red-200 text-sm p-6">Failed to load PDF.</div>}
                 >
-                  Close
-                </button>
+                  <Page
+                    pageNumber={page}
+                    width={fitWidth ? Math.min(1100, containerWidth - 32) : undefined}
+                    scale={fitWidth ? undefined : scale}
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                  />
+                </Document>
               </div>
 
-              <div className="flex-1">
-                <iframe
-                  src={`${open.url}#view=FitH&navpanes=0&toolbar=0`}
-                  className="h-full w-full"
-                  title="PDF Viewer"
-                />
+              <div className="mt-3 text-xs text-white/45 text-center">
+                Tip: Fit width for reading, +/− for zoom.
               </div>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

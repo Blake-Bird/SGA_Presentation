@@ -111,7 +111,8 @@ function migrateLoadedState(raw: any): AppState {
     purchase: e.purchase ? { ...e.purchase } : { statusText: "", lastUpdateISO: "" },
   })) as SgaEvent[];
 
-  const docs = Array.isArray(parsed.pdfWall?.docs) ? parsed.pdfWall!.docs : seed.pdfWall!.docs;
+  const loadedDocs = Array.isArray(parsed.pdfWall?.docs) ? parsed.pdfWall!.docs : null;
+  const docs = loadedDocs && loadedDocs.length > 0 ? loadedDocs : seed.pdfWall!.docs;
   const normalizedDocs = docs
     .map((d: any) => {
       // Backward compatibility: if old docs had dataUrl/objectUrl, skip them (too large for cloud anyway)
